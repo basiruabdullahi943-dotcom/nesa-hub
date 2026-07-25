@@ -1,0 +1,17 @@
+{
+  "name": "NESA HUB",
+  "short_name": "NESA HUB",
+  "description": "The official student support platform for Economics students at Bayero University Kano.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#4f46e5",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
