@@ -1,8 +1,14 @@
 import { useEffect, useState } from "react";
-import { db } from "../firebase";
+import { auth, db } from "../firebase";
 import {
   collection,
   getDocs,
+  addDoc,
+  deleteDoc,
+  doc,
+  query,
+  where,
+  setDoc,
   onSnapshot
 } from "firebase/firestore";
 
@@ -30,9 +36,7 @@ useEffect(() => {
   return () => unsubscribe();
 }, []);
 
-  const [savedItems, setSavedItems] = useState(
-  JSON.parse(localStorage.getItem("savedItems")) || []
-);
+const [savedItems, setSavedItems] = useState([]);
 
 const darkMode =
   localStorage.getItem("darkMode") === "true";
@@ -43,6 +47,7 @@ useEffect(() => {
 
 useEffect(() => {
   loadPastQuestions();
+  loadSavedItems();
 }, []);
 
 const loadPastQuestions = async () => {
@@ -77,6 +82,33 @@ const loadPastQuestionSessions = async () => {
     }));
 
     setPastQuestionSessions(sessions);
+
+  } catch (error) {
+    console.error(error);
+  }
+};
+
+const loadSavedItems = async () => {
+  try {
+    const user = auth.currentUser;
+
+    if (!user) return;
+
+    const snapshot = await getDocs(
+      collection(
+        db,
+        "savedItems",
+        user.uid,
+        "materials"
+      )
+    );
+
+    const data = snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+
+    setSavedItems(data);
 
   } catch (error) {
     console.error(error);
@@ -348,44 +380,70 @@ console.log({
 </>
   )}
 
-  <button
-  onClick={() => {
+<button
+  onClick={async () => {
+    try {
 
-    const alreadySaved =
-      savedItems.find(
+      const user = auth.currentUser;
+
+      if (!user) {
+        alert("Please login first.");
+        return;
+      }
+
+      const alreadySaved = savedItems.find(
         (saved) => saved.id === item.id
       );
 
-    let updatedSaved;
+      if (alreadySaved) {
 
-    if (alreadySaved) {
-  updatedSaved =
-    savedItems.filter(
-      (saved) => saved.id !== item.id
-    );
+        await deleteDoc(
+          doc(
+            db,
+            "savedItems",
+            user.uid,
+            "materials",
+            item.id
+          )
+        );
 
-  alert("❌ Removed from Saved.");
-} else {
-  updatedSaved = [
-    ...savedItems,
-    item
-  ];
+        setSavedItems(
+          savedItems.filter(
+            (saved) => saved.id !== item.id
+          )
+        );
 
-  alert("✅ Saved successfully!");
-}
+        alert("❌ Removed from Saved.");
 
-    setSavedItems(updatedSaved);
+      } else {
 
-    localStorage.setItem(
-      "savedItems",
-      JSON.stringify(updatedSaved)
-    );
+        await setDoc(
+          doc(
+            db,
+            "savedItems",
+            user.uid,
+            "materials",
+            item.id
+          ),
+          item
+        );
 
+        setSavedItems([
+          ...savedItems,
+          item
+        ]);
+
+        alert("✅ Saved successfully!");
+      }
+
+    } catch (error) {
+      console.error(error);
+      alert("Something went wrong.");
+    }
   }}
 
   style={{
     ...buttonStyle,
-
     background:
       savedItems.find(
         (saved) => saved.id === item.id

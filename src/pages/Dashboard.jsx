@@ -633,23 +633,6 @@ return (
   <div>Voting</div>
 </div>
 
-<div
-  onClick={() => navigate("/election-results")}
-  style={{
-    background: darkMode ? "#1f2937" : "#ffffff",
-    padding: "20px",
-    borderRadius: "15px",
-    textAlign: "center",
-    cursor: "pointer",
-    border: darkMode
-      ? "1px solid #374151"
-      : "1px solid #e5e7eb"
-  }}
->
-  <h2>🏆</h2>
-  <p>Election Results</p>
-</div>
-
       </div>
     </div>
   );

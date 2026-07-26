@@ -7,13 +7,7 @@ function Executives() {
   const [selectedSession, setSelectedSession] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
 
-const [executiveSessions, setExecutiveSessions] = useState(
-  JSON.parse(localStorage.getItem("executiveSessions")) || [
-    "2024/2025",
-    "2025/2026",
-    "2026/2027"
-  ]
-);
+const [executiveSessions, setExecutiveSessions] = useState([]);
 
 const [executives, setExecutives] = useState([]);
 
@@ -51,6 +45,39 @@ useEffect(() => {
   };
 
   loadExecutives();
+
+}, []);
+
+useEffect(() => {
+
+  const loadExecutiveSessions = async () => {
+
+    try {
+
+      const snapshot = await getDocs(
+        collection(db, "executiveSessions")
+      );
+
+      const sessions = snapshot.docs
+        .map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }))
+        .sort((a, b) =>
+          b.session.localeCompare(a.session)
+        );
+
+      setExecutiveSessions(sessions);
+
+    } catch (error) {
+
+      console.error(error);
+
+    }
+
+  };
+
+  loadExecutiveSessions();
 
 }, []);
 
@@ -118,9 +145,12 @@ const filteredExecutives = executives.filter((exec) => {
     }}
   >
     <option value="">📅 Select a session</option>
-    {executiveSessions.map((s) => (
-  <option key={s} value={s}>
-    {s}
+    {executiveSessions.map((item) => (
+  <option
+    key={item.id}
+    value={item.session}
+  >
+    {item.session}
   </option>
 ))}
   </select>

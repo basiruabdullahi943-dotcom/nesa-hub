@@ -90,7 +90,7 @@ backgroundColor: "#0f172a",
   style={{
     position: "absolute",
     bottom: "18px",
-    left: "40%",
+    left: "29%",
     transform: "translateX(-50%)",
     width: "72%",
     maxWidth: "280px",

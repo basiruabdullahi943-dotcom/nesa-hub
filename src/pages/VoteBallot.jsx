@@ -1,5 +1,16 @@
 import { useLocation, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
+import {
+  collection,
+  getDocs,
+  doc,
+  setDoc,
+  increment,
+  getDoc,
+  updateDoc
+} from "firebase/firestore";
+
+import { db } from "../firebase";
 
 function VoteBallot() {
   const location = useLocation();
@@ -12,21 +23,75 @@ function VoteBallot() {
   window.scrollTo(0, 0);
 }, []);
 
+useEffect(() => {
+  loadCandidates();
+}, []);
+
+const loadCandidates = async () => {
+  try {
+    const snapshot = await getDocs(
+      collection(db, "candidates")
+    );
+
+    const grouped = {};
+
+    snapshot.docs.forEach((docSnap) => {
+      const candidate = {
+        id: docSnap.id,
+        ...docSnap.data()
+      };
+
+      if (!grouped[candidate.position]) {
+        grouped[candidate.position] = [];
+      }
+
+      grouped[candidate.position].push(candidate);
+    });
+
+    setCandidates(grouped);
+
+  } catch (error) {
+    console.error(error);
+  }
+};
+
   const matric = location.state?.matric || "";
 
-  // Candidate data
-const savedCandidates =
-  JSON.parse(localStorage.getItem("candidates")) || [];
+  const safeMatric = matric.replaceAll("/", "_");
 
-const candidates = savedCandidates.reduce((acc, candidate) => {
-  if (!acc[candidate.position]) {
-    acc[candidate.position] = [];
-  }
+  const [candidates, setCandidates] = useState({});
 
-  acc[candidate.position].push(candidate);
+useEffect(() => {
+  const loadCandidates = async () => {
+    try {
+      const snapshot = await getDocs(
+        collection(db, "candidates")
+      );
 
-  return acc;
-}, {});
+      const data = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+
+      const grouped = data.reduce((acc, candidate) => {
+        if (!acc[candidate.position]) {
+          acc[candidate.position] = [];
+        }
+
+        acc[candidate.position].push(candidate);
+
+        return acc;
+      }, {});
+
+      setCandidates(grouped);
+
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  loadCandidates();
+}, []);
 
   const [votes, setVotes] = useState({});
 
@@ -64,7 +129,7 @@ const candidates = savedCandidates.reduce((acc, candidate) => {
   });
 };
 
-  const submitVotes = () => {
+  const submitVotes = async () => {
   const positions = Object.keys(candidates);
 
   // Validation
@@ -87,62 +152,67 @@ const candidates = savedCandidates.reduce((acc, candidate) => {
     }
   }
 
-  // Load existing results
-  const electionResults =
-    JSON.parse(localStorage.getItem("electionResults")) || {};
+// Save votes to Firestore
+for (const position of positions) {
 
-  // Count votes
-  positions.forEach((position) => {
+  if (candidates[position].length === 1) continue;
 
-    // Skip unopposed positions
-    if (candidates[position].length === 1) {
-      return;
-    }
+  const isSenator = position.includes("Senator");
 
-    if (!electionResults[position]) {
-      electionResults[position] = {};
-    }
+  if (!isSenator) {
 
-    const isSenator = position.includes("Senator");
+    const candidateId = votes[position];
 
-    if (!isSenator) {
-
-      const selectedId = votes[position];
-
-      electionResults[position][selectedId] =
-        (electionResults[position][selectedId] || 0) + 1;
-
-    } else {
-
-      votes[position].forEach((id) => {
-        electionResults[position][id] =
-          (electionResults[position][id] || 0) + 1;
-      });
-
-    }
-
-  });
-
-  // Save results
-  localStorage.setItem(
-    "electionResults",
-    JSON.stringify(electionResults)
-  );
-
-  // Mark student as voted
-  const votedStudents =
-    JSON.parse(localStorage.getItem("votedStudents")) || [];
-
-  if (!votedStudents.includes(matric)) {
-
-    votedStudents.push(matric);
-
-    localStorage.setItem(
-      "votedStudents",
-      JSON.stringify(votedStudents)
+    const voteRef = doc(
+      db,
+      "electionResults",
+      `${position}_${candidateId}`
     );
 
+    await setDoc(
+      voteRef,
+      {
+        position,
+        candidateId,
+        votes: increment(1)
+      },
+      { merge: true }
+    );
+
+  } else {
+
+    for (const candidateId of votes[position]) {
+
+      const voteRef = doc(
+        db,
+        "electionResults",
+        `${position}_${candidateId}`
+      );
+
+      await setDoc(
+        voteRef,
+        {
+          position,
+          candidateId,
+          votes: increment(1)
+        },
+        { merge: true }
+      );
+
+    }
+
   }
+
+}
+
+await setDoc(
+  doc(db, "votedStudents", safeMatric),
+  {
+    matric,
+    voted: true,
+    votedAt: new Date().toISOString()
+  }
+);
 
   alert("🎉 Vote submitted successfully!");
 

@@ -7,7 +7,9 @@ import {
   doc,
   getDoc,
   setDoc,
-  serverTimestamp
+  serverTimestamp,
+  query,
+  where
 } from "firebase/firestore";
 
 import { db } from "../firebase";
@@ -27,7 +29,7 @@ const [matric, setMatric] = useState("");
 
 const [electionOpen, setElectionOpen] = useState(false);
 
-const [password, setPassword] = useState("");
+const [email, setEmail] = useState("");
 const [showPassword, setShowPassword] = useState(false);
 
 const [verifiedVoters, setVerifiedVoters] = useState(0);
@@ -36,6 +38,7 @@ const [votesCast, setVotesCast] = useState(0);
 const [electionResults, setElectionResults] = useState({});
 
 const [candidates, setCandidates] = useState([]);
+const [groupedResults, setGroupedResults] = useState({});
 
 useEffect(() => {
   loadElectionStatus();
@@ -160,29 +163,69 @@ const loadCandidates = async () => {
   }
 };
 
+useEffect(() => {
+  if (!candidates.length) return;
+
+  const grouped = {};
+
+  candidates.forEach((candidate) => {
+    const position = candidate.position;
+
+    if (!grouped[position]) {
+      grouped[position] = [];
+    }
+
+    grouped[position].push({
+      ...candidate,
+      votes:
+        electionResults[position]?.[candidate.id] || 0
+    });
+  });
+
+  Object.keys(grouped).forEach((position) => {
+    grouped[position].sort(
+      (a, b) => b.votes - a.votes
+    );
+  });
+
+  setGroupedResults(grouped);
+
+}, [candidates, electionResults]);
+
 const handleVerify = async () => {
   const cleanMatric = matric.trim().toUpperCase();
   
-  const users =
-  JSON.parse(localStorage.getItem("registeredUsers")) || [];
+const usersRef = collection(db, "users");
 
-const user = users.find(
-  (u) =>
-    (u.matric || "").toUpperCase() === cleanMatric
+const q = query(
+  usersRef,
+  where("matric", "==", cleanMatric)
 );
 
-if (!user) {
+const snapshot = await getDocs(q);
+
+if (snapshot.empty) {
   alert("This matric number is not registered.");
   return;
 }
 
-if (password !== user.password) {
-  alert("Incorrect password.");
+
+if (!email.trim()) {
+  alert("Please enter your registered email.");
   return;
 }
 
-if (!password.trim()) {
-  alert("Please enter your app password.");
+const user = snapshot.docs[0].data();
+
+console.log("Firestore user:", user);
+console.log("Firestore email:", user.email);
+console.log("Entered email:", email);
+
+if (
+  (user.email || "").trim().toLowerCase() !==
+  email.trim().toLowerCase()
+) {
+  alert("Email does not match this matric number.");
   return;
 }
 
@@ -217,8 +260,10 @@ if (!eligible.includes(cleanMatric)) {
     return;
   }
 
+const safeMatric = cleanMatric.replaceAll("/", "_");
+
 const votedSnapshot = await getDoc(
-  doc(db, "votedStudents", cleanMatric)
+  doc(db, "votedStudents", safeMatric)
 );
 
 if (votedSnapshot.exists()) {
@@ -229,7 +274,7 @@ if (votedSnapshot.exists()) {
 const verifiedRef = doc(
   db,
   "verifiedVoters",
-  cleanMatric
+  safeMatric
 );
 
 const verifiedSnapshot = await getDoc(verifiedRef);
@@ -237,13 +282,16 @@ const verifiedSnapshot = await getDoc(verifiedRef);
 if (!verifiedSnapshot.exists()) {
 
   await setDoc(verifiedRef, {
-    matric: cleanMatric,
-    verifiedAt: serverTimestamp()
-  });
+  matric: cleanMatric,
+  verifiedAt: serverTimestamp()
+});
 
 }
 
   alert("Verification successful!");
+
+  setEmail("");
+setMatric("");
 
   setShowVerify(false);
 
@@ -327,7 +375,7 @@ if (!verifiedSnapshot.exists()) {
   Live Election Results
 </h2>
 
-      {candidates.map((candidate) => (
+       {candidates.map((candidate) => (
         <div
           key={candidate.id}
           style={{
@@ -397,26 +445,131 @@ if (!verifiedSnapshot.exists()) {
       ))}
 
       {/* Start Voting */}
-      <button
-  disabled={!electionOpen}
-  onClick={() => setShowVerify(true)}
-  style={{
-    width: "100%",
-    padding: "15px",
-    border: "none",
-    borderRadius: "15px",
-    background: electionOpen ? "#16a34a" : "#9ca3af",
-    color: "white",
-    fontSize: "18px",
-    fontWeight: "bold",
-    cursor: electionOpen ? "pointer" : "not-allowed",
-    marginTop: "20px"
-  }}
->
-  {electionOpen
-    ? "▶️ Start Voting"
-    : "🔒 Election Closed"}
-</button>
+      {electionOpen ? (
+  <button
+    onClick={() => setShowVerify(true)}
+    style={{
+      width: "100%",
+      padding: "15px",
+      border: "none",
+      borderRadius: "15px",
+      background: "#16a34a",
+      color: "white",
+      fontSize: "18px",
+      fontWeight: "bold",
+      cursor: "pointer",
+      marginTop: "20px"
+    }}
+  >
+    ▶️ Start Voting
+  </button>
+) : (
+  <>
+    <div
+      style={{
+        marginTop: "20px",
+        background: darkMode ? "#1f2937" : "#ffffff",
+        borderRadius: "15px",
+        padding: "20px",
+        border: darkMode
+          ? "1px solid #374151"
+          : "1px solid #e5e7eb"
+      }}
+    >
+      <h2
+        style={{
+          marginBottom: "20px",
+          color: darkMode ? "#f9fafb" : "#111827"
+        }}
+      >
+        🏆 Final Election Results
+      </h2>
+
+      {Object.entries(groupedResults).map(([position, list]) => {
+        const totalVotes = list.reduce(
+          (sum, c) => sum + c.votes,
+          0
+        );
+
+        const isSenator =
+          position.includes("Senator");
+
+        const winners = isSenator
+          ? list.slice(0, 2)
+          : list.slice(0, 1);
+
+        return (
+          <div
+            key={position}
+            style={{
+              marginBottom: "25px"
+            }}
+          >
+            <h3>{position}</h3>
+
+            {list.map((candidate, index) => {
+              const percentage =
+                totalVotes
+                  ? (
+                      (candidate.votes / totalVotes) *
+                      100
+                    ).toFixed(1)
+                  : "0.0";
+
+              return (
+                <div
+                  key={candidate.id}
+                  style={{
+                    display: "flex",
+                    justifyContent:
+                      "space-between",
+                    padding: "10px 0",
+                    borderBottom:
+                      index !== list.length - 1
+                        ? "1px solid #374151"
+                        : "none"
+                  }}
+                >
+                  <div>
+                    {index === 0
+                      ? "🥇 "
+                      : index === 1
+                      ? "🥈 "
+                      : index === 2
+                      ? "🥉 "
+                      : "• "}
+                    {candidate.name}
+                  </div>
+
+                  <div>
+                    {candidate.votes} Votes ({percentage}%)
+                  </div>
+                </div>
+              );
+            })}
+
+            <div
+              style={{
+                marginTop: "10px",
+                padding: "10px",
+                borderRadius: "10px",
+                background: "#16a34a",
+                color: "white",
+                fontWeight: "bold"
+              }}
+            >
+              {isSenator
+                ? `🏆 Winners: ${winners
+                    .map((w) => w.name)
+                    .join(" & ")}`
+                : `🏆 Winner: ${winners[0]?.name || "None"}`}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  </>
+)}
 
 {showVerify && (
   <div
@@ -481,44 +634,23 @@ if (!verifiedSnapshot.exists()) {
         }}
       />
 
-      <div
+<input
+  type="email"
+  placeholder="Enter your registered email"
+  value={email}
+  onChange={(e) => setEmail(e.target.value)}
   style={{
-    position: "relative",
+    width: "100%",
+    padding: "12px",
+    borderRadius: "10px",
+    border: darkMode
+      ? "1px solid #374151"
+      : "1px solid #d1d5db",
+    background: darkMode ? "#111827" : "#ffffff",
+    color: darkMode ? "#f9fafb" : "#111827",
     marginBottom: "15px"
   }}
->
-  <input
-    type={showPassword ? "text" : "password"}
-    placeholder="Enter your app password"
-    value={password}
-    onChange={(e) => setPassword(e.target.value)}
-    style={{
-      width: "100%",
-      padding: "12px",
-      paddingRight: "45px",
-      borderRadius: "10px",
-      border: darkMode
-        ? "1px solid #374151"
-        : "1px solid #d1d5db",
-      background: darkMode ? "#111827" : "#ffffff",
-      color: darkMode ? "#f9fafb" : "#111827"
-    }}
-  />
-
-  <span
-    onClick={() => setShowPassword(!showPassword)}
-    style={{
-      position: "absolute",
-      right: "15px",
-      top: "50%",
-      transform: "translateY(-50%)",
-      cursor: "pointer",
-      color: darkMode ? "#d1d5db" : "#6b7280"
-    }}
-  >
-    {showPassword ? <FaEyeSlash /> : <FaEye />}
-  </span>
-</div>
+/>
 
       <div style={{ display: "flex", gap: "10px" }}>
         <button

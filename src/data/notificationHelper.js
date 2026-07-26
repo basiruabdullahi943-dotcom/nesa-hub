@@ -1,6 +1,10 @@
-import { getNotifications } from "./notificationStore";
+import {
+  getNotifications,
+  saveNotifications
+} from "./notificationStore";
 
 export function sendNotification(title, message) {
+
   const notificationsEnabled =
     localStorage.getItem("notifications") !== "false";
 
@@ -14,16 +18,10 @@ export function sendNotification(title, message) {
     read: false
   });
 
-  localStorage.setItem(
-    "notifications",
-    JSON.stringify(notifications)
-  );
+  // Save notifications properly
+  saveNotifications(notifications);
 
-  // Notify the Notifications page to reload
-  window.dispatchEvent(
-    new Event("notificationsUpdated")
-  );
-
+  // Show toast notification
   if (notificationsEnabled) {
     window.dispatchEvent(
       new CustomEvent("showToast", {

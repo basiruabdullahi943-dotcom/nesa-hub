@@ -360,8 +360,6 @@ const loadExecutives = async () => {
 
   };
 
-  loadEligibleVoters();
-
 const loadCandidates = async () => {
 
   try {
@@ -594,6 +592,12 @@ const handleAddNews = async () => {
       });
 
       alert("Announcement added successfully");
+
+      sendNotification(
+  "New Announcement",
+  `${title} has been published.`
+);
+
     }
 
     setTitle("");
@@ -690,6 +694,11 @@ const addExecutive = async () => {
 
       alert("Executive added successfully");
 
+      sendNotification(
+  "New Executive Added",
+  `${execName} has been added as ${execPosition} for the ${execSession} executive session.`
+);
+
     }
 
     setExecName("");
@@ -706,6 +715,38 @@ const addExecutive = async () => {
     console.error(error);
 
     alert("Something went wrong");
+
+  }
+
+};
+
+const addExecutiveSession = async () => {
+
+  if (!newExecutiveSession.trim()) {
+    alert("Enter a session.");
+    return;
+  }
+
+  try {
+
+    await addDoc(
+      collection(db, "executiveSessions"),
+      {
+        session: newExecutiveSession.trim()
+      }
+    );
+
+    setNewExecutiveSession("");
+
+    await loadExecutiveSessions();
+
+    alert("Executive session added successfully.");
+
+  } catch (error) {
+
+    console.error(error);
+
+    alert("Failed to save session.");
 
   }
 
@@ -840,6 +881,11 @@ const addMaterial = async () => {
 
   alert("Material uploaded successfully");
 
+  sendNotification(
+  "New Material Uploaded",
+  `${materialTitle} has been added for ${materialLevel} Level.`
+);
+
 } catch (error) {
 
   console.error(error);
@@ -847,13 +893,7 @@ const addMaterial = async () => {
   alert("Upload failed");
 
 }
-
-    const notifications = getNotifications();
-
-    sendNotification(
-  "New Material Uploaded",
-  `${materialTitle} has been added for ${materialLevel} Level.`
-);
+    
   }
 
   setMaterialTitle("");
@@ -906,16 +946,6 @@ const addPastQuestion = async () => {
 
     alert("Past Question updated successfully");
 
-    const notifications = getNotifications();
-
-
-window.dispatchEvent(new Event("notificationsUpdated"));
-
-sendNotification(
-  "New Past Question Uploaded",
-  `${pastQuestionTitle} (${pastQuestionCourseCode}) has been uploaded for ${pastQuestionLevel} Level - ${pastQuestionSemester} Semester (${pastQuestionSession}).`
-);
-
   } else {
 
     await addDoc(
@@ -934,6 +964,14 @@ sendNotification(
     );
 
     alert("Past Question uploaded successfully");
+
+    
+sendNotification(
+  "New Past Question Uploaded",
+  `${pastQuestionTitle} (${pastQuestionCourseCode}) has been uploaded for ${pastQuestionLevel} Level - ${pastQuestionSemester} Semester (${pastQuestionSession}).`
+);
+
+
   }
 
   await loadPastQuestions();
@@ -995,10 +1033,6 @@ async function addTimetable() {
 
       alert("Timetable uploaded successfully");
 
-      const notifications = getNotifications();
-
-
-      window.dispatchEvent(new Event("notificationsUpdated"));
 
       sendNotification(
         "New Timetable Uploaded",
@@ -1244,6 +1278,7 @@ const saveEligibleVoters = async () => {
     );
 
     setEligibleVoters(list);
+    setEligibleInput(list.join("\n"));
 
     alert("Eligible voters saved successfully!");
 
@@ -1992,9 +2027,10 @@ reader.readAsDataURL(file);
       >
         <span>{item.session}</span>
 
-        <button
+<button
   type="button"
   onClick={async () => {
+
     const confirmDelete = window.confirm(
       `Remove ${item.session} from the session list?`
     );
@@ -2002,6 +2038,7 @@ reader.readAsDataURL(file);
     if (!confirmDelete) return;
 
     try {
+
       await deleteDoc(
         doc(db, "executiveSessions", item.id)
       );
@@ -2015,45 +2052,13 @@ reader.readAsDataURL(file);
       alert("Session removed successfully.");
 
     } catch (error) {
+
       console.error(error);
+
       alert("Failed to remove session.");
+
     }
-  }}
-  style={{
-    background: "#dc2626",
-    color: "white",
-    border: "none",
-    padding: "6px 10px",
-    borderRadius: "8px",
-    cursor: "pointer"
-  }}
->
-  Remove<button
-  type="button"
-  onClick={async () => {
-    const confirmDelete = window.confirm(
-      `Remove ${item.session} from the session list?`
-    );
 
-    if (!confirmDelete) return;
-
-    try {
-      await deleteDoc(
-        doc(db, "executiveSessions", item.id)
-      );
-
-      await loadExecutiveSessions();
-
-      if (execSession === item.session) {
-        setExecSession("");
-      }
-
-      alert("Session removed successfully.");
-
-    } catch (error) {
-      console.error(error);
-      alert("Failed to remove session.");
-    }
   }}
   style={{
     background: "#dc2626",
@@ -2065,7 +2070,6 @@ reader.readAsDataURL(file);
   }}
 >
   Remove
-</button>
 </button>
       </div>
     ))}

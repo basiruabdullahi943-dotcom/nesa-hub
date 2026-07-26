@@ -32,7 +32,6 @@ import HelpSupport from "./pages/HelpSupport";
 import Voting from "./pages/Voting";
 import VoteBallot from "./pages/VoteBallot";
 import VerifyEmail from "./pages/VerifyEmail";
-import ElectionResults from "./pages/ElectionResults";
 
 function App() {
 
@@ -86,14 +85,6 @@ if (loading) {
   element={
     <ProtectedRoute>
       <Materials />
-    </ProtectedRoute>
-  }
-/>
-<Route
-  path="/election-results"
-  element={
-    <ProtectedRoute>
-      <ElectionResults />
     </ProtectedRoute>
   }
 />
